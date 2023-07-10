@@ -12,6 +12,7 @@ library(shiny)
 library(shinydashboard)
 library(shinyFiles)
 library(shinybusy)
+library(shinyWidgets)
 
 library(tidyverse)
 library(ggplot2)
@@ -128,7 +129,14 @@ ui <- dashboardPage(
         
         actionButton("feemplot", label = "Plot sample FEEM",lib = "font-awesome", icon = icon("table-cells")),
                           
-        actionButton("friplot", label="Plot FRI, peaks, indices",lib = "font-awesome", icon = icon("chart-column"))
+        actionButton("friplot", label="Plot FRI, peaks, indices",lib = "font-awesome", icon = icon("chart-column")),
+        
+        downloadBttn(
+            outputId = "downloadRes",
+            style = "bordered",
+            color = "primary"
+        )
+        # downloadButton("downloadRes",label= "Download")
                           
                           
                           
@@ -315,13 +323,13 @@ server<-function(input, output, session){
                 select_if(~ !is.list(.x))%>%
                 ungroup()
             
-        feem.fri<-full_join(feem_FRI,feem_peak_ix,by="sampleId")%>%
+        feem.fri<-full_join(feem_FRI,feem_peak_ix,by="sampleId")#%>%
             # mutate(across(where(is.numeric), ~na_if(., Inf)), across(where(is.numeric), ~na_if(., -Inf)))%>% 
-            mutate(across(protein1:humic, ~./total))#divide by total
+            # mutate(across(protein1:humic, ~./total))#divide by total
             # mutate(across(protein1:humic, norm_z))#normalize 
-        fri.meta<-left_join(select(rvs$feem.metadata, sampleId,rvs$disc_select,rvs$cts_select),select(feem.fri,-total), by="sampleId")
+        fri.meta<-full_join(select(rvs$feem.metadata, sampleId,rvs$disc_select,rvs$cts_select),select(feem.fri,-total), by="sampleId")
         
-        
+        rvs$fri.meta<-fri.meta
         
         #Conventional regions + cyano, pigment FRI barplot 
         fri.plot<-pivot_longer(fri.meta,cols=protein1:humic,names_to = "Region", values_to = "Volume")
@@ -344,7 +352,7 @@ server<-function(input, output, session){
                       # axis.text.x=element_blank(),
                       axis.text.x = element_text(angle=45, hjust=1),
                       axis.text = element_text(size = 16, face = "bold"))+
-                scale_y_continuous(labels = scales::percent)+
+                # scale_y_continuous(labels = scales::percent)+
                 ylab("FRI Volume")+xlab(rvs$disc_select)
         
         if(is.Date(rvs$disc_select)){
@@ -439,6 +447,15 @@ server<-function(input, output, session){
         
     })#end withProgress
     })
+    
+    output$downloadRes <- downloadHandler(
+        filename = function() {
+            paste("fri_peaks_indices_", Sys.Date(), ".csv", sep="")
+        },
+        content = function(file) {
+            write.csv(rvs$fri.meta, file)
+        }
+    )
     
     
     
